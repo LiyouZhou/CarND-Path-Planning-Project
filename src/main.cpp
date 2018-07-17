@@ -8,7 +8,8 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
-
+#include "path_planner.h"
+#include <typeinfo>
 using namespace std;
 
 // for convenience
@@ -51,6 +52,7 @@ int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vect
 		double dist = distance(x,y,map_x,map_y);
 		if(dist < closestLen)
 		{
+      // printf("%f, %f, %f, %f ,%f\r\n", x, y, map_x, map_y, dist);
 			closestLen = dist;
 			closestWaypoint = i;
 		}
@@ -174,7 +176,7 @@ int main() {
   vector<double> map_waypoints_dy;
 
   // Waypoint map to read from
-  string map_file_ = "../data/highway_map.csv";
+  string map_file_ = "data/highway_map.csv";
   // The max s value before wrapping around the track back to 0
   double max_s = 6945.554;
 
@@ -213,12 +215,12 @@ int main() {
 
       if (s != "") {
         auto j = json::parse(s);
-        
+
         string event = j[0].get<string>();
-        
+
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          
+
         	// Main car's localization Data
           	double car_x = j[1]["x"];
           	double car_y = j[1]["y"];
@@ -228,30 +230,48 @@ int main() {
           	double car_speed = j[1]["speed"];
 
           	// Previous path data given to the Planner
-          	auto previous_path_x = j[1]["previous_path_x"];
-          	auto previous_path_y = j[1]["previous_path_y"];
-          	// Previous path's end s and d values 
+          	auto previous_path_x = j[1]["previous_path_x"].get<vector<double>>();
+          	auto previous_path_y = j[1]["previous_path_y"].get<vector<double>>();
+
+          	// Previous path's end s and d values
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
 
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
-          	auto sensor_fusion = j[1]["sensor_fusion"];
-
+          	auto sensor_fusion = j[1]["sensor_fusion"].get<vector<vector<double>>>();
           	json msgJson;
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
+            vector<double> car_state = {car_x, car_y, car_s, car_d, car_yaw, car_speed};
+            vector<double> previous_path_end_state = {end_path_s, end_path_d};
 
+            auto retval = plan_path(car_state,
+                                    previous_path_x,
+                                    previous_path_y,
+                                    previous_path_end_state,
+                                    sensor_fusion,
+                                    map_waypoints_x,
+                                    map_waypoints_y,
+                                    map_waypoints_s,
+                                    map_waypoints_dx,
+                                    map_waypoints_dy);
+
+            next_x_vals = retval[0];
+            next_y_vals = retval[1];
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
 
+            // cout << "cat state " << car_state[0] << endl;
+            // cout << msgJson["next_x"] << endl;
+
           	auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
           	//this_thread::sleep_for(chrono::milliseconds(1000));
           	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          
+
         }
       } else {
         // Manual driving
