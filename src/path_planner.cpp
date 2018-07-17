@@ -32,7 +32,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
                                  vector<double> map_waypoints_dx,
                                  vector<double> map_waypoints_dy)
 {
-    cout << "planning path" << endl;
+    // cout << "planning path" << endl;
     auto next_x_vals = new vector<double>;
     auto next_y_vals = new vector<double>;
     auto retval = new vector<vector<double>>;
@@ -44,41 +44,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
     double car_yaw   = deg2rad(car_state[4]);
     double car_speed = car_state[5];
 
-    // double pos_x;
-    // double pos_y;
-    // double angle;
-
-    // for(int i = 0; i < path_size; i++)
-    // {
-    //     next_x_vals->push_back(previous_path_x[i]);
-    //     next_y_vals->push_back(previous_path_y[i]);
-    // }
-
-    // if(path_size == 0)
-    // {
-    //     pos_x = car_x;
-    //     pos_y = car_y;
-    //     angle = deg2rad(car_yaw);
-    // }
-    // else
-    // {
-    //     pos_x = previous_path_x[path_size-1];
-    //     pos_y = previous_path_y[path_size-1];
-
-    //     double pos_x2 = previous_path_x[path_size-2];
-    //     double pos_y2 = previous_path_y[path_size-2];
-    //     angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
-    // }
-
-    // double dist_inc = 0.5;
-    // for(int i = 0; i < 50-path_size; i++)
-    // {
-    //     next_x_vals->push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(pi()/100)));
-    //     next_y_vals->push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(pi()/100)));
-    //     pos_x += (dist_inc)*cos(angle+(i+1)*(pi()/100));
-    //     pos_y += (dist_inc)*sin(angle+(i+1)*(pi()/100));
-    // }
-
     tk::spline s;
 
     // set spline anchor points
@@ -89,8 +54,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
     // add two points from previous path
     if (prev_path_size >= 2) {
         for (int i = prev_path_size-2; i<prev_path_size; i++) {
-            // cout << "x " << previous_path_x[i] << " y " << previous_path_y[i] << endl;
-
             // add to list
             ptsx.push_back(previous_path_x[i]);
             ptsy.push_back(previous_path_y[i]);
@@ -111,8 +74,10 @@ vector<vector<double>> plan_path(vector<double> car_state,
     if (prev_path_size >= 2) {
         x = previous_path_x[prev_path_size-1];
         y = previous_path_y[prev_path_size-1];
-        double dx = previous_path_x[prev_path_size-1] - previous_path_x[prev_path_size-2];
-        double dy = previous_path_y[prev_path_size-1] - previous_path_y[prev_path_size-2];
+        double dx = previous_path_x[prev_path_size-1] - \
+                    previous_path_x[prev_path_size-2];
+        double dy = previous_path_y[prev_path_size-1] - \
+                    previous_path_y[prev_path_size-2];
         theta = atan2(y, x);
     } else {
         x = car_x;
@@ -158,7 +123,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
     }
 
     for (int i = 0; i< ptsx.size(); i++) {
-        cout << "spline " << ptsx[i] << " " << ptsy[i];
+        // cout << "spline " << ptsx[i] << " " << ptsy[i];
         // transform into car coordinate
         auto dx = ptsx[i] - car_x;
         auto dy = ptsy[i] - car_y;
@@ -168,7 +133,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
         ptsx[i] = trans_x;
         ptsy[i] = trans_y;
 
-        cout << " -> " << ptsx[i] << " " << ptsy[i] << endl;
+        // cout << " -> " << ptsx[i] << " " << ptsy[i] << endl;
     }
     s.set_points(ptsx, ptsy);
 
@@ -201,34 +166,27 @@ vector<vector<double>> plan_path(vector<double> car_state,
         y_start = 0;
     }
 
-    printf("car pos %f %f %f\n", car_x, car_y, car_yaw);
+    // printf("car pos %f %f %f\n", car_x, car_y, car_yaw);
     for(int i=0; i<n_pts; i++){
-        // cout << i << endl;
-
         double next_x = x_start + (i+1)*dx;
         double next_y = s(next_x);
-        auto trans_x = car_x + next_x * cos(car_yaw) - next_y * sin(car_yaw);
-        auto trans_y = car_y + next_x * sin(car_yaw) + next_y * cos(car_yaw);
+        auto trans_x = car_x+next_x*cos(car_yaw)-next_y*sin(car_yaw);
+        auto trans_y = car_y+next_x*sin(car_yaw)+next_y*cos(car_yaw);
 
-        // vector<double> xy = getXY(next_s,
-        //                        next_d,
-        //                        map_waypoints_s,
-        //                        map_waypoints_x,
-        //                        map_waypoints_y);
-        // cout << "push" << endl;
-
-        vector<double> xy = getFrenet(trans_x, trans_y, car_yaw, map_waypoints_x, map_waypoints_y);
-        cout << "transx " << trans_x << " transy " << trans_y << " " << xy[0] << " " << xy[1] << endl;
+        vector<double> xy = getFrenet(trans_x, trans_y, car_yaw,
+                                      map_waypoints_x,
+                                      map_waypoints_y);
+        // cout << "transx " << trans_x << " transy " << trans_y
+        //      << " " << xy[0] << " " << xy[1] << endl;
 
         next_x_vals->push_back(trans_x);
         next_y_vals->push_back(trans_y);
     }
 
-
     retval->push_back(*next_x_vals);
     retval->push_back(*next_y_vals);
 
-    cout << "planning done" << endl;
+    // cout << "planning done" << endl;
 
     return *retval;
 }
