@@ -89,38 +89,20 @@ vector<vector<double>> plan_path(vector<double> car_state,
     int lane = 1;
     int prev_r = 0;
     for (int i = 0; i < 3; i ++) {
-        // get the next way point
-        int r = prev_r;
-        while (r == prev_r) {
-            x += cos(theta);
-            y += sin(theta);
-            r = NextWaypoint(x, y, theta,
-                             map_waypoints_x,
-                             map_waypoints_y);
-        }
-        prev_r = r;
-
-        double x_prev = x;
-        double y_prev = y;
-
-        x = map_waypoints_x[r];
-        y = map_waypoints_y[r];
-        theta = atan2(y-y_prev, x-x_prev);
-
-        // lock car in lane
-        vector<double> xy = getFrenet(x, y, theta,
+        int k = ptsx.size()-1;
+        float theta = atan2(ptsy[k]-ptsy[k-1], ptsx[k]-ptsx[k-1]);
+        vector<double> sd = getFrenet(ptsx[k], ptsy[k], theta,
                                       map_waypoints_x,
                                       map_waypoints_y);
-        xy = getXY(xy[0], 2+lane*4,
-                   map_waypoints_s,
-                   map_waypoints_x,
-                   map_waypoints_y);
-        x = xy[0];
-        y = xy[1];
+
+        vector<double> next_wp = getXY(sd[0]+30, sd[1],
+                                       map_waypoints_s,
+                                       map_waypoints_x,
+                                       map_waypoints_y);
 
         // cout << "x " << x << " y " << y << "theta" << theta << endl;
-        ptsx.push_back(x);
-        ptsy.push_back(y);
+        ptsx.push_back(next_wp[0]);
+        ptsy.push_back(next_wp[1]);
     }
 
     for (int i = 0; i< ptsx.size(); i++) {
@@ -219,6 +201,8 @@ vector<vector<double>> plan_path(vector<double> car_state,
 
         double next_x = x_start + (i+1)*dx;
         double next_y = s(next_x);
+
+        // transform to world coordinates
         auto trans_x = car_x+next_x*cos(car_yaw)-next_y*sin(car_yaw);
         auto trans_y = car_y+next_x*sin(car_yaw)+next_y*cos(car_yaw);
 
@@ -227,7 +211,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
         //                               map_waypoints_y);
         // cout << "transx " << trans_x << " transy " << trans_y
         //      << " " << xy[0] << " " << xy[1] << endl;
-        printf("%f, %f\n", trans_x, trans_y);
+        printf("%f, %f, %f, %f\n", trans_x, trans_y, path_end_speed, path_end_acc);
         next_x_vals->push_back(trans_x);
         next_y_vals->push_back(trans_y);
     }
