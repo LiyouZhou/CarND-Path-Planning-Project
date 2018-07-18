@@ -32,8 +32,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
                                  vector<double> map_waypoints_dx,
                                  vector<double> map_waypoints_dy)
 {
-    // cout << "planning path" << endl;
-
     auto next_x_vals = new vector<double>;
     auto next_y_vals = new vector<double>;
     auto retval = new vector<vector<double>>;
@@ -44,10 +42,11 @@ vector<vector<double>> plan_path(vector<double> car_state,
     double car_d     = car_state[3];
     double car_yaw   = deg2rad(car_state[4]);
     double car_speed = car_state[5];
+    int lane = 1;
 
     tk::spline s;
     vector<double> ptsx, ptsy;
-    int prev_path_size = prev_path_size;
+    int prev_path_size = previous_path_x.size();
 
     if (prev_path_size >= 2) {
         // add two points from previous path
@@ -61,7 +60,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
                                       map_waypoints_x,
                                       map_waypoints_y);
 
-        vector<double> next_wp = getXY(sd[0]-30, sd[1],
+        vector<double> next_wp = getXY(sd[0]-30, 2+lane*4,
                                        map_waypoints_s,
                                        map_waypoints_x,
                                        map_waypoints_y);
@@ -74,7 +73,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
     }
 
     // add 3 future points
-    int lane = 1;
     for (int i = 0; i < 3; i ++) {
         int k = ptsx.size()-1;
         float theta = atan2(ptsy[k]-ptsy[k-1], ptsx[k]-ptsx[k-1]);
@@ -82,7 +80,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
                                       map_waypoints_x,
                                       map_waypoints_y);
 
-        vector<double> next_wp = getXY(sd[0]+30, sd[1],
+        vector<double> next_wp = getXY(sd[0]+30, 2+lane*4,
                                        map_waypoints_s,
                                        map_waypoints_x,
                                        map_waypoints_y);
@@ -131,9 +129,9 @@ vector<vector<double>> plan_path(vector<double> car_state,
     }
 
     const float dt = 0.02; // s
-    const float max_acc = 4; // m/s/s
+    const float max_acc = 4.5; // m/s/s
     const float max_jerk = 40; // m/s/s/s
-    const float max_speed = 48; // mph
+    const float max_speed = 47; // mph
 
     float target_speed = max_speed / 2.24; // m/s
     float target_jerk = 0;
@@ -160,17 +158,32 @@ vector<vector<double>> plan_path(vector<double> car_state,
 
     static float path_end_speed = 0;
     static float path_end_acc = 0;
+    // if (prev_path_size >= 3) {
+    //     printf("calculating speed using previous path\n");
+    //     auto x0 = previous_path_x[prev_path_size-3];
+    //     auto y0 = previous_path_y[prev_path_size-3];
+    //     auto x1 = previous_path_x[prev_path_size-2];
+    //     auto y1 = previous_path_y[prev_path_size-2];
+    //     auto x2 = previous_path_x[prev_path_size-1];
+    //     auto y2 = previous_path_y[prev_path_size-1];
+
+    //     auto d0 = distance(x1, y1, x0, y0);
+    //     auto d1 = distance(x2, y2, x1, y1);
+
+    //     path_end_speed = d1/dt;
+    //     path_end_acc = (path_end_speed - d0/dt)/dt;
+    // }
 
     for(int i=0; i<n_pts; i++){
-        if (path_end_speed > target_speed) {
-            target_jerk = -max_jerk;
+        if (path_end_speed > target_speed && path_end_acc > -max_acc) {
+            target_jerk = (path_end_acc+max_acc > max_jerk)? -max_jerk:-(path_end_acc + max_acc);
+        } else if (path_end_speed < target_speed && path_end_acc < max_acc) {
+            target_jerk = (max_acc-path_end_acc > max_jerk)? max_jerk:max_acc-path_end_acc;
         } else {
-            target_jerk = max_jerk;
+            target_jerk = 0;
         }
 
         path_end_acc += target_jerk * dt;
-        if (path_end_acc > max_acc) path_end_acc = max_acc;
-        if (path_end_acc < -max_acc) path_end_acc = -max_acc;
         path_end_speed += path_end_acc * dt;
 
         float d_s = path_end_speed * dt + path_end_acc * dt * dt / 2.0;
