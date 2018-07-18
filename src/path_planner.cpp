@@ -46,48 +46,35 @@ vector<vector<double>> plan_path(vector<double> car_state,
     double car_speed = car_state[5];
 
     tk::spline s;
-
-    // set spline anchor points
     vector<double> ptsx, ptsy;
+    int prev_path_size = prev_path_size;
 
-    int prev_path_size = previous_path_x.size();
-
-    // add two points from previous path
     if (prev_path_size >= 2) {
+        // add two points from previous path
         for (int i = prev_path_size-2; i<prev_path_size; i++) {
-            // add to list
             ptsx.push_back(previous_path_x[i]);
             ptsy.push_back(previous_path_y[i]);
         }
     } else {
-        double prev_car_x = car_x - cos(car_yaw);
-        double prev_car_y = car_y - sin(car_yaw);
+        // add a previous way point
+        vector<double> sd = getFrenet(car_x, car_y, car_yaw,
+                                      map_waypoints_x,
+                                      map_waypoints_y);
 
-        ptsx.push_back(prev_car_x);
-        ptsy.push_back(prev_car_y);
+        vector<double> next_wp = getXY(sd[0]-30, sd[1],
+                                       map_waypoints_s,
+                                       map_waypoints_x,
+                                       map_waypoints_y);
+        ptsx.push_back(next_wp[0]);
+        ptsy.push_back(next_wp[1]);
 
+        // add car current position as way points
         ptsx.push_back(car_x);
         ptsy.push_back(car_y);
     }
 
     // add 3 future points
-    double x, y, theta;
-    if (prev_path_size >= 2) {
-        x = previous_path_x[prev_path_size-1];
-        y = previous_path_y[prev_path_size-1];
-        double dx = previous_path_x[prev_path_size-1] - \
-                    previous_path_x[prev_path_size-2];
-        double dy = previous_path_y[prev_path_size-1] - \
-                    previous_path_y[prev_path_size-2];
-        theta = atan2(y, x);
-    } else {
-        x = car_x;
-        y = car_y;
-        theta = car_yaw;
-    }
-
     int lane = 1;
-    int prev_r = 0;
     for (int i = 0; i < 3; i ++) {
         int k = ptsx.size()-1;
         float theta = atan2(ptsy[k]-ptsy[k-1], ptsx[k]-ptsx[k-1]);
@@ -100,14 +87,12 @@ vector<vector<double>> plan_path(vector<double> car_state,
                                        map_waypoints_x,
                                        map_waypoints_y);
 
-        // cout << "x " << x << " y " << y << "theta" << theta << endl;
         ptsx.push_back(next_wp[0]);
         ptsy.push_back(next_wp[1]);
     }
 
+    // transform anchor points into car coordinate
     for (int i = 0; i< ptsx.size(); i++) {
-        // cout << "spline " << ptsx[i] << " " << ptsy[i];
-        // transform into car coordinate
         auto dx = ptsx[i] - car_x;
         auto dy = ptsy[i] - car_y;
         auto trans_x = dx * cos(-car_yaw) - dy * sin(-car_yaw);
@@ -115,8 +100,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
 
         ptsx[i] = trans_x;
         ptsy[i] = trans_y;
-
-        // cout << " -> " << ptsx[i] << " " << ptsy[i] << endl;
     }
     s.set_points(ptsx, ptsy);
 
@@ -128,11 +111,11 @@ vector<vector<double>> plan_path(vector<double> car_state,
     int n_pts = 50;
     double x_start, y_start;
     if (prev_path_size >= 2) {
-        for(int i=0; i<previous_path_x.size(); i++){
+        for(int i=0; i<prev_path_size; i++){
             next_x_vals->push_back(previous_path_x[i]);
             next_y_vals->push_back(previous_path_y[i]);
         }
-        n_pts -= previous_path_x.size();
+        n_pts -= prev_path_size;
         x_start = previous_path_x[prev_path_size-1];
         y_start = previous_path_y[prev_path_size-1];
 
@@ -147,7 +130,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
         y_start = 0;
     }
 
-    // printf("car pos %f %f %f\n", car_x, car_y, car_yaw);
     const float dt = 0.02; // s
     const float max_acc = 4; // m/s/s
     const float max_jerk = 40; // m/s/s/s
@@ -169,11 +151,8 @@ vector<vector<double>> plan_path(vector<double> car_state,
             float current_dist =  sensor_fusion[i][5]- car_s;
             float future_dist = s - previous_path_end_state[0];
 
-            // printf("car in lane %.02f %.02f speed %.02f\n", current_dist, future_dist, v * 2.24);
-
             if ((future_dist > 0 && future_dist < 30) ||
                 (current_dist*future_dist<0)) {
-                // printf("car in front %.02f %.02f speed %.02f\n", previous_path_end_state[0], s-30, v * 2.24);
                 target_speed = v*0.9;
             }
         }
@@ -197,8 +176,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
         float d_s = path_end_speed * dt + path_end_acc * dt * dt / 2.0;
         float dx = target_x * d_s / target_dist;
 
-        // printf("%d mph %.02f acc %.02f d_s %.02f dx %.02f jerk %.02f target speed %.02f\n", i, path_end_speed*2.24, path_end_acc, d_s, dx, target_jerk, target_speed);
-
         double next_x = x_start + (i+1)*dx;
         double next_y = s(next_x);
 
@@ -206,29 +183,12 @@ vector<vector<double>> plan_path(vector<double> car_state,
         auto trans_x = car_x+next_x*cos(car_yaw)-next_y*sin(car_yaw);
         auto trans_y = car_y+next_x*sin(car_yaw)+next_y*cos(car_yaw);
 
-        // vector<double> xy = getFrenet(trans_x, trans_y, car_yaw,
-        //                               map_waypoints_x,
-        //                               map_waypoints_y);
-        // cout << "transx " << trans_x << " transy " << trans_y
-        //      << " " << xy[0] << " " << xy[1] << endl;
+        // add points to path
         printf("%f, %f, %f, %f\n", trans_x, trans_y, path_end_speed, path_end_acc);
         next_x_vals->push_back(trans_x);
         next_y_vals->push_back(trans_y);
     }
 
-    // double s_prev = 0;
-    // for(int i=0; i<next_x_vals->size(); i++){
-    //     double x = (*next_x_vals)[i];
-    //     double y = (*next_y_vals)[i];
-
-    //     vector<double> sd = getFrenet(x, y, car_yaw,
-    //                                   map_waypoints_x,
-    //                                   map_waypoints_y);
-
-    //     double ds = s_prev - sd[0];
-    //     s_prev = sd[0];
-    //     printf("%d s %.02f\n", i, ds);
-    // }
     retval->push_back(*next_x_vals);
     retval->push_back(*next_y_vals);
 
