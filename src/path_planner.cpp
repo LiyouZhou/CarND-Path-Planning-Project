@@ -33,6 +33,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
                                  vector<double> map_waypoints_dy)
 {
     // cout << "planning path" << endl;
+
     auto next_x_vals = new vector<double>;
     auto next_y_vals = new vector<double>;
     auto retval = new vector<vector<double>>;
@@ -141,8 +142,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
     double target_x = 30;
     double target_y = s(target_x);
     double target_dist = distance(0, 0, target_x, target_y);
-    const double ref_vel = 49.5 / 2.24;
-    float dx = target_x * 0.02 * ref_vel / target_dist;
 
     int n_pts = 50;
     double x_start, y_start;
@@ -167,22 +166,85 @@ vector<vector<double>> plan_path(vector<double> car_state,
     }
 
     // printf("car pos %f %f %f\n", car_x, car_y, car_yaw);
+    const float dt = 0.02; // s
+    const float max_acc = 4; // m/s/s
+    const float max_jerk = 40; // m/s/s/s
+    const float max_speed = 48; // mph
+
+    float target_speed = max_speed / 2.24; // m/s
+    float target_jerk = 0;
+
+    for(int i=0; i<sensor_fusion.size(); i++){
+        float d = sensor_fusion[i][6];
+        float crt_lane_centre = 2+4*lane;
+        if (d < (crt_lane_centre+2) && d > (crt_lane_centre-2)) {
+            // car in my lane
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double v = sqrt(vx*vx + vy*vy);
+            double s = sensor_fusion[i][5] + v * dt * next_x_vals->size();
+
+            float current_dist =  sensor_fusion[i][5]- car_s;
+            float future_dist = s - previous_path_end_state[0];
+
+            // printf("car in lane %.02f %.02f speed %.02f\n", current_dist, future_dist, v * 2.24);
+
+            if ((future_dist > 0 && future_dist < 30) ||
+                (current_dist*future_dist<0)) {
+                // printf("car in front %.02f %.02f speed %.02f\n", previous_path_end_state[0], s-30, v * 2.24);
+                target_speed = v*0.9;
+            }
+        }
+    }
+
+    static float path_end_speed = 0;
+    static float path_end_acc = 0;
+
     for(int i=0; i<n_pts; i++){
+        if (path_end_speed > target_speed) {
+            target_jerk = -max_jerk;
+        } else {
+            target_jerk = max_jerk;
+        }
+
+        path_end_acc += target_jerk * dt;
+        if (path_end_acc > max_acc) path_end_acc = max_acc;
+        if (path_end_acc < -max_acc) path_end_acc = -max_acc;
+        path_end_speed += path_end_acc * dt;
+
+        float d_s = path_end_speed * dt + path_end_acc * dt * dt / 2.0;
+        float dx = target_x * d_s / target_dist;
+
+        // printf("%d mph %.02f acc %.02f d_s %.02f dx %.02f jerk %.02f target speed %.02f\n", i, path_end_speed*2.24, path_end_acc, d_s, dx, target_jerk, target_speed);
+
         double next_x = x_start + (i+1)*dx;
         double next_y = s(next_x);
         auto trans_x = car_x+next_x*cos(car_yaw)-next_y*sin(car_yaw);
         auto trans_y = car_y+next_x*sin(car_yaw)+next_y*cos(car_yaw);
 
-        vector<double> xy = getFrenet(trans_x, trans_y, car_yaw,
-                                      map_waypoints_x,
-                                      map_waypoints_y);
+        // vector<double> xy = getFrenet(trans_x, trans_y, car_yaw,
+        //                               map_waypoints_x,
+        //                               map_waypoints_y);
         // cout << "transx " << trans_x << " transy " << trans_y
         //      << " " << xy[0] << " " << xy[1] << endl;
-
+        printf("%f, %f\n", trans_x, trans_y);
         next_x_vals->push_back(trans_x);
         next_y_vals->push_back(trans_y);
     }
 
+    // double s_prev = 0;
+    // for(int i=0; i<next_x_vals->size(); i++){
+    //     double x = (*next_x_vals)[i];
+    //     double y = (*next_y_vals)[i];
+
+    //     vector<double> sd = getFrenet(x, y, car_yaw,
+    //                                   map_waypoints_x,
+    //                                   map_waypoints_y);
+
+    //     double ds = s_prev - sd[0];
+    //     s_prev = sd[0];
+    //     printf("%d s %.02f\n", i, ds);
+    // }
     retval->push_back(*next_x_vals);
     retval->push_back(*next_y_vals);
 
