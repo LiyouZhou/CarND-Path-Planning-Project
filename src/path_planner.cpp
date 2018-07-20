@@ -133,7 +133,8 @@ vector<vector<double>> plan_path(vector<double> car_state,
 
     vector<double> lane_speed = {1000, 1000, 1000};
 
-    if (target_speed < 0.8*(max_speed/2.24)) {
+    // only consider change lane if driving too slowly
+    if (target_speed < 0.85*(max_speed/2.24)) {
         for(int i=0; i<sensor_fusion.size(); i++){
             float d = sensor_fusion[i][6];
             int bogie_lane = d/4;
@@ -149,7 +150,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
 
             printf("car_speed %f current_dist %f future_dist %f\n", car_speed, current_dist, future_dist);
 
-            if ((abs(future_dist) < 30) || (abs(current_dist) < 30) ||
+            if ((abs(future_dist) < 15) || (abs(current_dist) < 15) ||
                 (current_dist*future_dist<0)) {
                 if (bogie_lane == left_lane && bogie_lane < 3) {
                     // bogie in the lane to the left
