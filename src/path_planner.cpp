@@ -5,7 +5,7 @@
 
 using namespace std;
 
-// For converting back and forth between radians and degrees.
+// Get all functions declared in main.cpp
 extern double pi();
 extern double deg2rad(double x);
 extern double rad2deg(double x);
@@ -20,15 +20,17 @@ extern double distance(double x1, double y1, double x2, double y2);
 extern vector<double> getFrenet(double x, double y, double theta,
                                 const vector<double> &maps_x,
                                 const vector<double> &maps_y);
+
+// Vehicle state
 typedef enum {
     PLANNER_STATE_LANE_FOLLOW,
-    PLANNER_STATE_LANE_CHANGE_PREPARE,
     PLANNER_STATE_LANE_CHANGE_RIGHT,
     PLANNER_STATE_LANE_CHANGE_LEFT
 } path_planner_state_t;
 
 path_planner_state_t path_planner_state = PLANNER_STATE_LANE_FOLLOW;
 
+// Calculate speed and acceleration given 3 points in a path
 vector<double> calculate_speed_and_acc(vector<vector<double>> pts, double dt) {
     auto x0 = pts[0][0];
     auto y0 = pts[0][1];
@@ -91,6 +93,8 @@ vector<vector<double>> plan_path(vector<double> car_state,
     auto next_y_vals = new vector<double>;
     auto retval = new vector<vector<double>>;
 
+    // keep executing generated path if in lane changing state
+    // do not generate new points
     if (path_planner_state != PLANNER_STATE_LANE_FOLLOW) {
         if (previous_path_x.size() > 10) {
             printf("keep executing lane change\n");
@@ -145,7 +149,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
             if ((future_dist > 0 && future_dist < 30) ||
                 (current_dist*future_dist<0)) {
                 target_speed = v*0.9;
-                printf("car in front set speed to %f\n",  target_speed);
             }
         }
     }
@@ -181,38 +184,28 @@ vector<vector<double>> plan_path(vector<double> car_state,
             float current_dist = sensor_fusion[i][5]- car_s;
             float future_dist = bogie_future_s - car_s - car_speed * 3;
 
-            // printf("bogie_lane %u car_speed %f current_dist %f future_dist %f\n", bogie_lane, car_speed, current_dist, future_dist);
-
+            // keep clearance of 15m
             if ((abs(future_dist) < 15) || (abs(current_dist) < 15) ||
                 (current_dist*future_dist<0)) {
                 if (bogie_lane == left_lane && bogie_lane >= 0) {
                     // bogie in the lane to the left
-                    // printf("left_lane_blocked\n");
                     left_lane_blocked = true;
                 } else if (bogie_lane == right_lane && bogie_lane < 3) {
                     // bogie in the lane to the right
-                    // printf("right_lane_blocked\n");
                     right_lane_blocked = true;
                 }
             }
 
-            // bogie in front
+            // bogie in front, update leading vehicle speed and clearance
             if (current_dist > 0) {
                 if (v < lane_speed[bogie_lane])
                     lane_speed[bogie_lane] = v;
                 if (current_dist < lane_clearance[bogie_lane])
-                    lane_clearance[bogie_lane] == current_dist;
+                    lane_clearance[bogie_lane] = current_dist;
             }
         }
     }
 
-    // printf("lane speed ");
-    // for (int i = 2; i >= 0; --i)
-    // {
-    //     printf("%f ", lane_speed[i]);
-    // }
-    // printf(" %i %i %i %i %i", left_lane_blocked, right_lane_blocked, left_lane, lane, right_lane);
-    // printf("\n");
     // decide to change lane
     if ((!left_lane_blocked) &&
         (lane_speed[left_lane] > lane_speed[lane] ||
@@ -239,7 +232,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
                 ptsx.push_back(previous_path_x[i]);
                 ptsy.push_back(previous_path_y[i]);
             }
-        } else { // executing lane change
+        } else { // in lane change state
             // add the first 3 points from previous path and trim the rest
             for (int i = 0; i<3; i++) {
                 ptsx.push_back(previous_path_x[i]);
@@ -334,6 +327,10 @@ vector<vector<double>> plan_path(vector<double> car_state,
         y_start = dx * sin(-car_yaw) + dy * cos(-car_yaw);
 
         // calculate the path end speed and acc
+        // only do this in lane follow state as we cut short the
+        // previous path and generate new path
+        // in normal state we rely on path_end_speed, path_end_acc to
+        // hold value from previous call
         if (path_planner_state != PLANNER_STATE_LANE_FOLLOW) {
             vector<vector<double>> pts;
             for (int i=no_of_pts_to_add-3; i<no_of_pts_to_add; i++) {
@@ -344,7 +341,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
             path_end_acc = retval[1];
         }
     } else {
-        // start path generation at the car
+        // start path generation at the car position
         x_start = 0;
         y_start = 0;
         path_end_speed = car_speed;
@@ -376,7 +373,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
                 return distance(x_start, s(x_start), x_start+dx, s(x_start+dx)) - d_s;
             });
 
-        // printf("d_x %f\n", d_x);
         x_start += d_x;
         y_start = s(x_start);
 
@@ -385,7 +381,6 @@ vector<vector<double>> plan_path(vector<double> car_state,
         auto trans_y = car_y+x_start*sin(car_yaw)+y_start*cos(car_yaw);
 
         // add points to path
-        // printf("%f, %f, %f, %f\n", x_start, y_start, path_end_speed, path_end_acc);
         next_x_vals->push_back(trans_x);
         next_y_vals->push_back(trans_y);
     }

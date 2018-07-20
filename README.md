@@ -17,7 +17,7 @@ In a lane change state, a path of 200 points is generated to guide the vehicle i
 
 Normally the vehicle is in lane following state. If it sees there is a car in front of it, it will slow down to match the speed of the leading vehicle. If the speed is too slow, it will start to evaluate options to change lanes.
 
-The vehicle first looks at all moving objects detected by sensor fusion in the adjacent lanes. Project all their locations 3s into the future using the object's speed. If any of the object comes within 30m of our eagle vehicle, then we say that lane is blocked.
+The vehicle first looks at all moving objects detected by sensor fusion in the adjacent lanes. Project all their locations 3s into the future using the object's speed. If any of the object comes within 15m of our eagle vehicle, then we say that lane is blocked.
 
 If the lane is not blocked, then look at two things.
 1. What is the speed of the leading vehicle in each candidate lane, is it larger than that of the current lane.
