@@ -164,6 +164,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
     }
 
     vector<double> lane_speed = {1000, 1000, 1000};
+    vector<double> lane_clearance = {1000, 1000, 1000};
 
     // only consider change lane if driving too slowly
     if (target_speed < 0.8*(max_speed/2.24)) {
@@ -196,8 +197,11 @@ vector<vector<double>> plan_path(vector<double> car_state,
             }
 
             // bogie in front
-            if (current_dist > 0 && v < lane_speed[bogie_lane]) {
-                lane_speed[bogie_lane] = v;
+            if (current_dist > 0) {
+                if (v < lane_speed[bogie_lane])
+                    lane_speed[bogie_lane] = v;
+                if (current_dist < lane_clearance[bogie_lane])
+                    lane_clearance[bogie_lane] == current_dist;
             }
         }
     }
@@ -210,10 +214,14 @@ vector<vector<double>> plan_path(vector<double> car_state,
     // printf(" %i %i %i %i %i", left_lane_blocked, right_lane_blocked, left_lane, lane, right_lane);
     // printf("\n");
     // decide to change lane
-    if ((!left_lane_blocked) && (lane_speed[left_lane] > lane_speed[lane])) {
+    if ((!left_lane_blocked) &&
+        (lane_speed[left_lane] > lane_speed[lane] ||
+         lane_clearance[left_lane] > lane_clearance[lane])) {
         printf("PLANNER_STATE_LANE_CHANGE_LEFT\n");
         path_planner_state = PLANNER_STATE_LANE_CHANGE_LEFT;
-    } else if ((!right_lane_blocked) && (lane_speed[right_lane] > lane_speed[lane])) {
+    } else if ((!right_lane_blocked) &&
+               (lane_speed[right_lane] > lane_speed[lane] ||
+                lane_clearance[right_lane] > lane_clearance[lane])) {
         printf("PLANNER_STATE_LANE_CHANGE_RIGHT\n");
         path_planner_state = PLANNER_STATE_LANE_CHANGE_RIGHT;
     }
