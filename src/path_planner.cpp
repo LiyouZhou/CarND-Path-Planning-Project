@@ -110,7 +110,7 @@ vector<vector<double>> plan_path(vector<double> car_state,
             float current_dist =  sensor_fusion[i][5]- car_s;
             float future_dist = s - previous_path_end_state[0];
 
-            if ((future_dist > 0 && future_dist < 30) ||
+            if ((future_dist > 0 && future_dist < 20) ||
                 (current_dist*future_dist<0)) {
                 target_speed = v*0.9;
                 printf("car in front set speed to %f\n",  target_speed);
@@ -119,22 +119,22 @@ vector<vector<double>> plan_path(vector<double> car_state,
     }
 
     // think about changing lanes
-    bool left_lane = lane + 1;
-    bool right_lane = lane - 1;
+    int left_lane = lane - 1;
+    int right_lane = lane + 1;
     bool left_lane_blocked = false;
     bool right_lane_blocked = false;
 
     // confine car in the 3 lanes on the right
     if (lane == 0) {
-        right_lane_blocked = true;
-    } else if (lane == 2) {
         left_lane_blocked = true;
+    } else if (lane == 2) {
+        right_lane_blocked = true;
     }
 
     vector<double> lane_speed = {1000, 1000, 1000};
 
     // only consider change lane if driving too slowly
-    if (target_speed < 0.85*(max_speed/2.24)) {
+    if (target_speed < 0.8*(max_speed/2.24)) {
         for(int i=0; i<sensor_fusion.size(); i++){
             float d = sensor_fusion[i][6];
             int bogie_lane = d/4;
@@ -148,15 +148,17 @@ vector<vector<double>> plan_path(vector<double> car_state,
             float current_dist = sensor_fusion[i][5]- car_s;
             float future_dist = bogie_future_s - car_s - car_speed * 3;
 
-            printf("car_speed %f current_dist %f future_dist %f\n", car_speed, current_dist, future_dist);
+            printf("bogie_lane %u car_speed %f current_dist %f future_dist %f\n", bogie_lane, car_speed, current_dist, future_dist);
 
             if ((abs(future_dist) < 15) || (abs(current_dist) < 15) ||
                 (current_dist*future_dist<0)) {
-                if (bogie_lane == left_lane && bogie_lane < 3) {
+                if (bogie_lane == left_lane && bogie_lane >= 0) {
                     // bogie in the lane to the left
+                    printf("left_lane_blocked\n");
                     left_lane_blocked = true;
-                } else if (bogie_lane == right_lane) {
+                } else if (bogie_lane == right_lane && bogie_lane < 3) {
                     // bogie in the lane to the right
+                    printf("right_lane_blocked\n");
                     right_lane_blocked = true;
                 }
             }
@@ -169,11 +171,11 @@ vector<vector<double>> plan_path(vector<double> car_state,
     }
 
     printf("lane speed ");
-    for (int i = 0; i < 3; ++i)
+    for (int i = 2; i >= 0; --i)
     {
         printf("%f ", lane_speed[i]);
     }
-    printf(" %i %i", left_lane_blocked, right_lane_blocked);
+    printf(" %i %i %i %i %i", left_lane_blocked, right_lane_blocked, left_lane, lane, right_lane);
     printf("\n");
     // decide to change lane
     if ((!left_lane_blocked) && (lane_speed[left_lane] > lane_speed[lane])) {
@@ -224,9 +226,9 @@ vector<vector<double>> plan_path(vector<double> car_state,
 
     // generate the future points in a different lane
     if (path_planner_state == PLANNER_STATE_LANE_CHANGE_LEFT) {
-        lane++;
-    } else if (path_planner_state == PLANNER_STATE_LANE_CHANGE_RIGHT) {
         lane--;
+    } else if (path_planner_state == PLANNER_STATE_LANE_CHANGE_RIGHT) {
+        lane++;
     }
 
     // add 3 future points
