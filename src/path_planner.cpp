@@ -2,6 +2,7 @@
 #include <iostream>
 #include "path_planner.h"
 #include "spline.h"
+#include <functional>
 
 using namespace std;
 
