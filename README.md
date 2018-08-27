@@ -1,5 +1,6 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
+
 ![Lane Change](https://media.giphy.com/media/7TeMZ33ZA9I1v38Jp3/giphy.gif)
 
 ## Goals
